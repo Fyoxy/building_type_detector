@@ -387,7 +387,7 @@ def calculate_accuracy(top, right, left):
     building_types = [
         {"type": "Type_1_317", "expected": [6, 6, 6]},
         {"type": "Type_1_464", "expected": [5, 6, 6]},
-        {"type": "Type_1_432", "expected": [4, 4, 2]}
+        {"type": "Type_1_432", "expected": [3, 4, 4]}
     ]
     
     # Define weights
