@@ -227,7 +227,7 @@ def run(
             im0 = annotator.result()
 
             # Building type detection
-            # im0 = CheckBuildingType(pred, gn, im0)
+            im0 = CheckBuildingType(pred, gn, im0)
             
             if view_img:
                 if platform.system() == "Linux" and p not in windows:
@@ -268,79 +268,6 @@ def run(
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
-
-def CheckBuildingType(pred, gn, im0):
-    import shapely.geometry as sg
-
-    # Initialize variables to store information about the object of class 2 with the highest confidence
-    max_confidence = 0
-    max_confidence_obj = None
-
-    # Counter for collisions with object 0
-    collisions = 0
-    door_collisions = 0
-
-    # Iterate through the detections
-    for i, det in enumerate(pred):
-        if len(det):
-            for *xyxy, conf, cls in reversed(det):
-                c = int(cls)  # integer class
-                confidence = float(conf)
-
-                # Check if the object is of class 2 and has higher confidence than the current maximum
-                if c == 2 and confidence > max_confidence:
-                    max_confidence = confidence
-                    max_confidence_obj = (xyxy, confidence)  # Store the bounding box and confidence
-
-    # If there is an object of class 2 with the highest confidence, proceed to draw the line
-    if max_confidence_obj is not None:
-        xyxy, max_confidence = max_confidence_obj
-
-        # Define the height of the image
-        img_height, img_width = im0.shape[:2]
-
-        # Calculate the center of the bounding box
-        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()
-        center_x = xywh[0]
-        center_y = xywh[1]
-        center_y_top = xywh[1] - xywh[3] / 2
-
-        # Convert normalized coordinates to pixel coordinates
-        center_x_px = int(center_x * img_width)
-        center_y_px = int(center_y * img_height)
-        center_y_top_px = int(center_y_top * img_height)
-
-        # Draw the lines on the image
-        cv2.line(im0, (center_x_px, center_y_px), (center_x_px, 0), (0, 255, 0), 2)  # Vertical line
-        cv2.line(im0, (0, center_y_px), (img_width, center_y_px), (0, 255, 0), 2)    # Horizontal line
-        cv2.line(im0, (0, center_y_top_px), (img_width, center_y_top_px), (0, 255, 0), 2)    # Horizontal line
-
-        # Define a line from the center of object 2 going straight up
-        line = sg.LineString([(center_x_px, center_y_px), (center_x_px, 0)])
-        line_cross = sg.LineString([(0, center_y_px), (img_width, center_y_px)])
-        line_cross_windows = sg.LineString([(0, center_y_top_px), (img_width, center_y_top_px)])
-
-        # Check for collisions with objects of class 0
-        for *xyxy_0, _, cls_0 in reversed(det):
-            xywh_0 = (xyxy2xywh(torch.tensor(xyxy_0).view(1, 4)) / gn).view(-1).tolist()
-            # Create a polygon representing the bounding box of object 0
-            polygon_0 = sg.box(xywh_0[0] * img_width, xywh_0[1] * img_height, (xywh_0[0] + xywh_0[2]) * img_width, (xywh_0[1] + xywh_0[3]) * img_height)
-
-            if int(cls_0) == 0:
-                # Check if the line intersects with the bounding box of object 0
-                if line.intersects(polygon_0):
-                    collisions += 1
-                if line_cross_windows.intersects(polygon_0):
-                    collisions += 1
-            elif int(cls_0) == 2:
-                if line_cross.intersects(polygon_0):
-                    door_collisions += 1
-    
-    print(f"Number of collisions with object 0: {collisions}")
-    print(f"Number of door_collisions with object 2: {door_collisions}")
-
-
-    return im0
 
 def ClosestObject(xyxy, gn, det, im0):
     import math
